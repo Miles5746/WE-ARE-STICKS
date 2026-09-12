@@ -29,37 +29,6 @@ function AnimationLib.new(config)
     self.Connections = {}
     self.CurrentTrack = nil
 
-    self.Modules = {
-        Fly = {
-            Enabled = false,
-            Start = function()
-                self:_startFly()
-            end,
-            Stop = function()
-                self:_stopFly()
-            end
-        },
-        WalkFling = {
-            Enabled = false,
-            Start = function()
-                local character = LocalPlayer.Character
-                local root = character and character:FindFirstChild("HumanoidRootPart")
-                local humanoid = character and character:FindFirstChildWhichIsA("Humanoid")
-
-                if humanoid then
-                    humanoid.Died:Connect(function()
-                        self:ToggleModule("WalkFling")
-                    end)
-                end
-
-                self:_startWalkFling(character, root)
-            end,
-            Stop = function()
-                self:_stopWalkFling()
-            end
-        }
-    }
-
     self:_setupCharacter()
     self:_setupKeybinds()
     self:_setupOverrides()
@@ -172,81 +141,6 @@ function AnimationLib:_setupKeybinds()
     end)
 
     table.insert(self.Connections, inputConn)
-end
-
-function AnimationLib:_startWalkFling(character, root)
-    local walkflinging = true
-    local movel = 0.1
-
-    while walkflinging do
-        RunService.Heartbeat:Wait()
-
-        if character and character.Parent and root and root.Parent then
-            local vel = root.Velocity
-            root.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
-
-            RunService.RenderStepped:Wait()
-            if character and character.Parent and root and root.Parent then
-                root.Velocity = vel
-            end
-
-            RunService.Stepped:Wait()
-            if character and character.Parent and root and root.Parent then
-                root.Velocity = vel + Vector3.new(0, movel, 0)
-                movel = movel * -1
-            end
-        end
-    end
-end
-
-function AnimationLib:_stopWalkFling()
-    local noclipConn = nil
-    local walkflinging = false
-    noclipConn = RunService.Stepped:Connect(function()
-        if not walkflinging then
-            noclipConn:Disconnect()
-        end
-        LocalPlayer.Character:FindFirstChild("HumanoidRootPart").Velocity = Vector3.new()
-    end)
-end
-
-function AnimationLib:_startFly()
-    local flySpeed = 50
-
-    local flyingConn = RunService.Stepped:Connect(function()
-        local character = LocalPlayer.Character
-        local root = character and character:FindFirstChild("HumanoidRootPart")
-
-        if character and character.Parent and root and root.Parent then
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-                root.Velocity = root.Velocity + Vector3.new(0, flySpeed, 0)
-            elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-                root.Velocity = root.Velocity + Vector3.new(0, -flySpeed, 0)
-            end
-        end
-    end)
-
-    table.insert(self.Connections, flyingConn)
-end
-
-function AnimationLib:_stopFly()
-    for _, conn in ipairs(self.Connections) do
-        if typeof(conn) == "RBXScriptConnection" and conn.Connected then
-            conn:Disconnect()
-        end
-    end
-end
-
-function AnimationLib:ToggleModule(name)
-    local mod = self.Modules[name]
-    if mod then
-        mod.Enabled = not mod.Enabled
-        if mod.Enabled then
-            mod.Start()
-        else
-            mod.Stop()
-        end
-    end
 end
 
 function AnimationLib:Destroy()
