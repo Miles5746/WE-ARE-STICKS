@@ -89,7 +89,7 @@ end
 
 function AnimationLib:PlayTrack(name, fadeTime, weight, speed)
     local track = self.Tracks[name]
-    if track then
+    if track and track.IsA and track:IsA("Animation") then
         track:Play(fadeTime or 0.1, weight or 1, speed or 1)
         self.CurrentTrack = track
         return track
