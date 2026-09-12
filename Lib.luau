@@ -82,14 +82,14 @@ function AnimationLib:LoadTrack(name, assetId)
     local anim = Instance.new("Animation")
     anim.AnimationId = resolvedId
 
-    local track = Animator:LoadAnimation(anim.AnimationId)
+    local track = Animator:LoadAnimation(anim)
     self.Tracks[name] = track
     return track
 end
 
 function AnimationLib:PlayTrack(name, fadeTime, weight, speed)
     local track = self.Tracks[name]
-    if track and track.IsA and track:IsA("Animation") then
+    if track and typeof(track) == "Instance" and track:IsA("AnimationTrack") then
         track:Play(fadeTime or 0.1, weight or 1, speed or 1)
         self.CurrentTrack = track
         return track
@@ -121,12 +121,18 @@ function AnimationLib:_setupOverrides()
     oldLoadAnimation = hookmetamethod(Animator, "__namecall", function(selfObj, ...)
         local method = getnamecallmethod()
         if selfObj == Animator and method == "LoadAnimation" then
-            local animInstance = select(1, ...)
-            if animInstance and animInstance:IsA("Animation") then
-                local animId = animInstance.AnimationId
-                local override = AnimationLib._activeInstance and AnimationLib._activeInstance.Overrides[animId]
+            local animArg = select(1, ...)
+            local animId = nil
 
-                if override then
+            if typeof(animArg) == "Instance" and animArg:IsA("Animation") then
+                animId = animArg.AnimationId
+            elseif type(animArg) == "string" then
+                animId = animArg
+            end
+
+            if animId then
+                local override = AnimationLib._activeInstance and AnimationLib._activeInstance.Overrides[animId]
+                if override and override.Track and typeof(override.Track) == "Instance" and override.Track:IsA("AnimationTrack") then
                     task.spawn(function()
                         if not override.Track.IsPlaying then
                             override.Track:Play(0.1, 1, 1)
@@ -205,11 +211,9 @@ function AnimationLib:_stopWalkFling()
 end
 
 function AnimationLib:_startFly()
-    local flyingConn = nil
-    local flyingEnabled = true
     local flySpeed = 50
 
-    flyingConn = RunService.Stepped:Connect(function()
+    local flyingConn = RunService.Stepped:Connect(function()
         local character = LocalPlayer.Character
         local root = character and character:FindFirstChild("HumanoidRootPart")
 
@@ -254,7 +258,7 @@ function AnimationLib:Destroy()
     table.clear(self.Connections)
 
     for _, track in pairs(self.Tracks) do
-        if track and track.IsA and track:IsA("Animation") then
+        if typeof(track) == "Instance" and track:IsA("AnimationTrack") then
             track:Stop()
             track:Destroy()
         end
