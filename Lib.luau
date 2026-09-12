@@ -82,7 +82,7 @@ function AnimationLib:LoadTrack(name, assetId)
     local anim = Instance.new("Animation")
     anim.AnimationId = resolvedId
 
-    local track = Animator:LoadAnimation(anim)
+    local track = Animator:LoadAnimation(anim.AnimationId)
     self.Tracks[name] = track
     return track
 end
@@ -247,14 +247,19 @@ end
 
 function AnimationLib:Destroy()
     for _, conn in ipairs(self.Connections) do
-        conn:Disconnect()
+        if typeof(conn) == "RBXScriptConnection" and conn.Connected then
+            conn:Disconnect()
+        end
     end
+    table.clear(self.Connections)
+
     for _, track in pairs(self.Tracks) do
-        track:Stop()
-        track:Destroy()
+        if track and track.IsA and track:IsA("Animation") then
+            track:Stop()
+            track:Destroy()
+        end
     end
     table.clear(self.Tracks)
-    table.clear(self.Connections)
     table.clear(self.Overrides)
 end
 
