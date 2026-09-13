@@ -7,6 +7,31 @@ local LocalPlayer = Players.LocalPlayer
 -- Load the clean base library
 local AnimationLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Miles5746/WE-ARE-STICKS/refs/heads/main/Lib.luau"))()
 
+local oldLoadAnimation
+oldLoadAnimation = hookfunction(Instance.new("Animator").LoadAnimation, function(selfObj, ...)
+    local animArg = select(1, ...)
+    local animId = nil
+
+    if typeof(animArg) == "Instance" and animArg:IsA("Animation") then
+        animId = animArg.AnimationId
+    elseif type(animArg) == "string" then
+        animId = animArg
+    end
+
+    if animId then
+        local active = AnimationLib._activeInstance
+        local override = active and active.Overrides[animId]
+        if override and override.Track and typeof(override.Track) == "Instance" and override.Track:IsA("AnimationTrack") then
+            task.spawn(function()
+                if not override.Track.IsPlaying then
+                    override.Track:Play(0.1, 1, 1)
+                end
+            end)
+        end
+    end
+    return oldLoadAnimation(selfObj, ...)
+end)
+
 -- Extend the constructor to initialize the modules table dynamically
 local originalNew = AnimationLib.new
 function AnimationLib.new(config)
