@@ -1,69 +1,106 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
-local Animator = Humanoid:WaitForChild("Animator")
 
 local AnimationLib = {}
+AnimationLib.__index = AnimationLib
 
--- Resolves asset ID to actual Animation instance ID
+-- Resolves asset ID to actual Animation instance ID (safe: GetObjects can throw)
 local function anim2track(asset_id)
-    local objs = game:GetObjects(asset_id)
-    for i = 1, #objs do
-        if objs[i]:IsA("Animation") then
-            return objs[i].AnimationId
+    local ok, objs = pcall(function()
+        return game:GetObjects(asset_id)
+    end)
+
+    if ok and objs then
+        for i = 1, #objs do
+            if objs[i]:IsA("Animation") then
+                return objs[i].AnimationId
+            end
         end
     end
+
     return asset_id
 end
 
 function AnimationLib.new(config)
-    local self = {}
+    local self = setmetatable({}, AnimationLib)
+
     self.Config = config or {}
     self.Tracks = {}
     self.Overrides = {}
     self.Connections = {}
     self.CurrentTrack = nil
 
-    -- Copy all library methods directly to this instance without metatables
-    for key, val in pairs(AnimationLib) do
-        if type(val) == "function" and key ~= "new" then
-            self[key] = val
-        end
-    end
+    -- Per-instance character state (was previously shared module upvalues)
+    self.Character = nil
+    self.Humanoid = nil
+    self.Animator = nil
 
+    self:_bindCharacter(LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait())
     self:_setupCharacter()
     self:_setupKeybinds()
 
     return self
 end
 
+-- Wires up Character/Humanoid/Animator + the override-listening connection
+-- for whichever character is currently active.
+function AnimationLib:_bindCharacter(character)
+    self.Character = character
+    self.Humanoid = character:WaitForChild("Humanoid")
+    self.Animator = self.Humanoid:WaitForChild("Animator")
+
+    local overrideConn = self.Animator.AnimationPlayed:Connect(function(track)
+        self:_handleOverride(track)
+    end)
+    table.insert(self.Connections, overrideConn)
+end
+
+-- Actually applies the Overrides table: if the animation that just started
+-- playing matches a registered override target, stop it and play the
+-- replacement instead.
+function AnimationLib:_handleOverride(track)
+    local animId = track.Animation and track.Animation.AnimationId
+    if not animId then return end
+
+    local override = self.Overrides[animId]
+    if override and override.Track then
+        track:Stop(0)
+        override.Track:Play(0, track.WeightTarget, track.Speed)
+        self.CurrentTrack = override.Track
+    end
+end
+
 function AnimationLib:_setupCharacter()
     local charConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
-        Character = newChar
-        Humanoid = newChar:WaitForChild("Humanoid")
-        Animator = Humanoid:WaitForChild("Animator")
         self.Tracks = {}
+        self:_bindCharacter(newChar)
     end)
     table.insert(self.Connections, charConn)
 end
 
 function AnimationLib:LoadTrack(name, assetId)
     local resolvedId = anim2track(assetId)
+
+    -- Avoid leaking a previously loaded track under the same name
+    local existing = self.Tracks[name]
+    if existing then
+        existing:Stop(0)
+        existing:Destroy()
+    end
+
     local anim = Instance.new("Animation")
     anim.AnimationId = resolvedId
 
-    local track = Animator:LoadAnimation(anim)
+    local track = self.Animator:LoadAnimation(anim)
     self.Tracks[name] = track
     return track
 end
 
 function AnimationLib:PlayTrack(name, fadeTime, weight, speed)
     local track = self.Tracks[name]
-    if track and typeof(track) == "Instance" and track:IsA("AnimationTrack") then
+    if track and track:IsA("AnimationTrack") then
         track:Play(fadeTime or 0.1, weight or 1, speed or 1)
         self.CurrentTrack = track
         return track
@@ -91,8 +128,6 @@ function AnimationLib:AddOverride(targetAssetId, replacementAssetId, name)
 end
 
 function AnimationLib:_setupKeybinds()
-    AnimationLib._activeInstance = self
-
     local inputConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
 
