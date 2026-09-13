@@ -28,7 +28,7 @@ function AnimationLib.new(config)
     self.Connections = {}
     self.CurrentTrack = nil
 
-    -- Copy all library methods directly to this instance
+    -- Copy all library methods directly to this instance without metatables
     for key, val in pairs(AnimationLib) do
         if type(val) == "function" and key ~= "new" then
             self[key] = val
@@ -37,7 +37,6 @@ function AnimationLib.new(config)
 
     self:_setupCharacter()
     self:_setupKeybinds()
-    self:_setupOverrides()
 
     return self
 end
@@ -89,32 +88,6 @@ function AnimationLib:AddOverride(targetAssetId, replacementAssetId, name)
         Track = track,
         Name = trackName
     }
-end
-
-function AnimationLib:_setupOverrides()
-    local oldLoadAnimation
-    oldLoadAnimation = hookfunction(Instance.new("Animator").LoadAnimation, function(selfObj, ...)
-        local animArg = select(1, ...)
-        local animId = nil
-
-        if typeof(animArg) == "Instance" and animArg:IsA("Animation") then
-            animId = animArg.AnimationId
-        elseif type(animArg) == "string" then
-            animId = animArg
-        end
-
-        if animId then
-            local override = AnimationLib._activeInstance and AnimationLib._activeInstance.Overrides[animId]
-            if override and override.Track and typeof(override.Track) == "Instance" and override.Track:IsA("AnimationTrack") then
-                task.spawn(function()
-                    if not override.Track.IsPlaying then
-                        override.Track:Play(0.1, 1, 1)
-                    end
-                end)
-            end
-        end
-        return oldLoadAnimation(selfObj, ...)
-    end)
 end
 
 function AnimationLib:_setupKeybinds()
