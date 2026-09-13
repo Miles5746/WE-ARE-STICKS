@@ -28,7 +28,7 @@ function AnimationLib.new(config)
     self.Connections = {}
     self.CurrentTrack = nil
 
-    -- Copy all library methods directly to this instance without metatables
+    -- Copy all library methods directly to this instance
     for key, val in pairs(AnimationLib) do
         if type(val) == "function" and key ~= "new" then
             self[key] = val
