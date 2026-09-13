@@ -8,7 +8,6 @@ local Humanoid = Character:WaitForChild("Humanoid")
 local Animator = Humanoid:WaitForChild("Animator")
 
 local AnimationLib = {}
-AnimationLib.__index = AnimationLib
 
 -- Resolves asset ID to actual Animation instance ID
 local function anim2track(asset_id)
@@ -22,12 +21,19 @@ local function anim2track(asset_id)
 end
 
 function AnimationLib.new(config)
-    local self = setmetatable({}, AnimationLib)
+    local self = {}
     self.Config = config or {}
     self.Tracks = {}
     self.Overrides = {}
     self.Connections = {}
     self.CurrentTrack = nil
+
+    -- Copy all library methods directly to this instance without metatables
+    for key, val in pairs(AnimationLib) do
+        if type(val) == "function" and key ~= "new" then
+            self[key] = val
+        end
+    end
 
     self:_setupCharacter()
     self:_setupKeybinds()
@@ -87,27 +93,24 @@ end
 
 function AnimationLib:_setupOverrides()
     local oldLoadAnimation
-    oldLoadAnimation = hookmetamethod(Animator, "__namecall", function(selfObj, ...)
-        local method = getnamecallmethod()
-        if selfObj == Animator and method == "LoadAnimation" then
-            local animArg = select(1, ...)
-            local animId = nil
+    oldLoadAnimation = hookfunction(Instance.new("Animator").LoadAnimation, function(selfObj, ...)
+        local animArg = select(1, ...)
+        local animId = nil
 
-            if typeof(animArg) == "Instance" and animArg:IsA("Animation") then
-                animId = animArg.AnimationId
-            elseif type(animArg) == "string" then
-                animId = animArg
-            end
+        if typeof(animArg) == "Instance" and animArg:IsA("Animation") then
+            animId = animArg.AnimationId
+        elseif type(animArg) == "string" then
+            animId = animArg
+        end
 
-            if animId then
-                local override = AnimationLib._activeInstance and AnimationLib._activeInstance.Overrides[animId]
-                if override and override.Track and typeof(override.Track) == "Instance" and override.Track:IsA("AnimationTrack") then
-                    task.spawn(function()
-                        if not override.Track.IsPlaying then
-                            override.Track:Play(0.1, 1, 1)
-                        end
-                    end)
-                end
+        if animId then
+            local override = AnimationLib._activeInstance and AnimationLib._activeInstance.Overrides[animId]
+            if override and override.Track and typeof(override.Track) == "Instance" and override.Track:IsA("AnimationTrack") then
+                task.spawn(function()
+                    if not override.Track.IsPlaying then
+                        override.Track:Play(0.1, 1, 1)
+                    end
+                end)
             end
         end
         return oldLoadAnimation(selfObj, ...)
