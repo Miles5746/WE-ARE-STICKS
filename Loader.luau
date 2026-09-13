@@ -5,7 +5,7 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 -- Load the clean base library
-local AnimationLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/animationlib.lua"))()
+local AnimationLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Miles5746/WE-ARE-STICKS/refs/heads/main/Lib.luau"))()
 
 -- Extend the constructor to initialize the modules table dynamically
 local originalNew = AnimationLib.new
